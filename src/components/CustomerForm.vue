@@ -15,41 +15,51 @@
       </button>
     </header>
 
-    <form @submit.prevent="sendEmail" ref="form" class="customer-form">
-      <div class="form-group">
-        <label for="name">Name</label>
-        <input type="text" id="name" v-model="form.name" required />
-        <span v-if="errors.name" class="error">{{ errors.name }}</span>
-      </div>
+    <div v-if="!submitted">
+      <form @submit.prevent="sendEmail" ref="form" class="customer-form">
+        <div class="form-group">
+          <label for="name">Name</label>
+          <input type="text" id="name" v-model="form.name" placeholder="Enter your full name" required />
+          <span v-if="errors.name" class="error">{{ errors.name }}</span>
+        </div>
 
-      <div class="form-group">
-        <label for="address">Address</label>
-        <textarea id="address" v-model="form.address" required></textarea>
-        <span v-if="errors.address" class="error">{{ errors.address }}</span>
-      </div>
+        <div class="form-group">
+          <label for="address">Address</label>
+          <textarea id="address" v-model="form.address" placeholder="Enter your full address" required></textarea>
+          <span v-if="errors.address" class="error">{{ errors.address }}</span>
+        </div>
 
-      <div class="form-group">
-        <label for="phone">WhatsApp/Contact</label>
-        <input type="tel" id="phone" v-model="form.phone" required />
-        <span v-if="errors.phone" class="error">{{ errors.phone }}</span>
-      </div>
+        <div class="form-group">
+          <label for="phone">WhatsApp/Contact</label>
+          <input type="text" id="phone" :value="form.phone" @input="formatPhone" @keypress="isNumber" inputmode="numeric" maxlength="12" placeholder="0321-1144567" required />
+          <span v-if="errors.phone" class="error">{{ errors.phone }}</span>
+        </div>
 
-      <button type="submit" class="submit-btn" :disabled="isSubmitting">
-        {{ isSubmitting ? 'Sending...' : 'Submit' }}
-      </button>
-    </form>
+        <button type="submit" class="submit-btn" :disabled="isSubmitting">
+          {{ isSubmitting ? 'Sending...' : 'Submit' }}
+        </button>
+      </form>
 
-    <p v-if="message" :class="['message', messageType]">{{ message }}</p>
+      <p v-if="message" :class="['message', messageType]">{{ message }}</p>
+    </div>
+
+    <div v-else class="success-message">
+      <h2>🎉 Congratulations! 🎉</h2>
+      <p>Your order has been placed successfully!</p>
+      <p>Our team will contact you soon.</p>
+      <vue-confetti :active="confettiActive" :duration="0" />
+    </div>
   </div>
 </template>
 
 <script>
 import emailjs from '@emailjs/browser';
 import { BuildingOfficeIcon, SunIcon, MoonIcon } from '@heroicons/vue/24/outline';
+import VueConfetti from 'vue-confetti';
 
 export default {
   name: 'CustomerForm',
-  components: { BuildingOfficeIcon, SunIcon, MoonIcon },
+  components: { BuildingOfficeIcon, SunIcon, MoonIcon, VueConfetti },
   data() {
     return {
       isDark: false,
@@ -57,11 +67,13 @@ export default {
       errors: { name: '', address: '', phone: '' },
       isSubmitting: false,
       message: '',
-      messageType: ''
+      messageType: '',
+      submitted: false,
+      confettiActive: false
     };
   },
   mounted() {
-    this.isDark = localStorage.getItem('theme') === 'dark';
+    this.isDark = localStorage.getItem('theme') === 'dark' || !localStorage.getItem('theme');
     this.applyTheme();
   },
   methods: {
@@ -72,6 +84,19 @@ export default {
     },
     applyTheme() {
       document.documentElement.setAttribute('data-theme', this.isDark ? 'dark' : 'light');
+    },
+    formatPhone(event) {
+      let value = event.target.value.replace(/\D/g, '');
+      if (value.length > 11) value = value.slice(0, 11);
+      if (value.length >= 4) {
+        value = value.slice(0, 4) + '-' + value.slice(4);
+      }
+      this.form.phone = value;
+    },
+    isNumber(event) {
+      if (!/[0-9]/.test(event.key) && event.key !== 'Backspace' && event.key !== 'Delete' && event.key !== 'Tab') {
+        event.preventDefault();
+      }
     },
     validateForm() {
       this.errors = { name: '', address: '', phone: '' };
@@ -90,9 +115,12 @@ export default {
       if (!this.form.phone.trim()) {
         this.errors.phone = 'Phone number is required.';
         isValid = false;
-      } else if (!/^\+?\d{10,15}$/.test(this.form.phone.replace(/\s/g, ''))) {
-        this.errors.phone = 'Please enter a valid phone number.';
-        isValid = false;
+      } else {
+        const phoneDigits = this.form.phone.replace(/\D/g, '');
+        if (phoneDigits.length !== 11 || !phoneDigits.startsWith('03')) {
+          this.errors.phone = 'Please enter a valid Pakistani phone number (11 digits starting with 03).';
+          isValid = false;
+        }
       }
 
       return isValid;
@@ -110,9 +138,8 @@ export default {
           this.$refs.form,
           'YOUR_PUBLIC_KEY'
         );
-        this.message = 'Form submitted successfully!';
-        this.messageType = 'success';
-        this.form = { name: '', address: '', phone: '' };
+        this.submitted = true;
+        this.confettiActive = true;
       } catch (error) {
         this.message = 'Failed to send form. Please try again.';
         this.messageType = 'error';
@@ -314,7 +341,7 @@ textarea {
   border: 1.5px solid var(--input-border);
   border-radius: 8px;
   background-color: var(--input-bg);
-  color: var(--text-color);
+  color: black;
   box-sizing: border-box;
   transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
   outline: none; /* we'll handle focus ourselves */
@@ -418,6 +445,12 @@ textarea {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+.success-message {
+  text-align: center;
+  padding: 20px;
+  color: var(--text-color);
 }
 
 /* Responsive */
